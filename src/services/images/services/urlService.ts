@@ -82,8 +82,37 @@ export const getImageUrlByKey = async (key: string, retryCount = 0): Promise<str
       return '/placeholder.svg';
     }
 
+    // if (!data || !data.storage_path) {
+    //   log(`No image or storage path found for key ${key}`);
+    //   return '/placeholder.svg';
+    // }
     if (!data || !data.storage_path) {
       log(`No image or storage path found for key ${key}`);
+      
+      // Try fallback logic for mobile/desktop variants
+      let fallbackKey = null;
+      
+      if (key.endsWith('-mobile')) {
+        // If mobile version not found, try desktop version
+        fallbackKey = key.replace('-mobile', '');
+        log(`Mobile key ${key} not found, trying desktop fallback: ${fallbackKey}`);
+      } else if (!key.endsWith('-mobile')) {
+        // If desktop version not found, try mobile version
+        fallbackKey = `${key}-mobile`;
+        log(`Desktop key ${key} not found, trying mobile fallback: ${fallbackKey}`);
+      }
+      
+      // Attempt fallback if we have one
+      if (fallbackKey && retryCount === 0) {
+        log(`Attempting fallback with key: ${fallbackKey}`);
+        try {
+          return await getImageUrlByKey(fallbackKey, 1); // Prevent infinite recursion with retryCount = 1
+        } catch (fallbackError) {
+          log(`Fallback also failed for ${fallbackKey}`, fallbackError);
+        }
+      }
+      
+      log(`No fallback available for key ${key}, using placeholder`);
       return '/placeholder.svg';
     }
 
