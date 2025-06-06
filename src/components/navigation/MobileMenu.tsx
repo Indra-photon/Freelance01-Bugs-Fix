@@ -27,7 +27,7 @@ const MobileMenu = ({ isOpen, isScrolled, toggleMenu, navLinks, user, onSignOut 
   if (!isOpen) return null;
 
   return (
-    <div className="md:hidden py-4 space-y-4 backdrop-blur-md bg-black bg-opacity-20 rounded-lg mt-2 px-4">
+    <div className="lg:hidden py-4 space-y-4 backdrop-blur-md bg-black bg-opacity-20 rounded-lg mt-2 px-4">
       {navLinks.map(link => (
         <MobileNavigationLink
           key={link.name}
