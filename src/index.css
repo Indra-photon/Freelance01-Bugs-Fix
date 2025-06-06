@@ -78,11 +78,11 @@
 
 /* Consistent Heading Styles */
 .heading-1 {
-  @apply text-4xl md:text-5xl lg:text-6xl font-playfair text-navy;
+  @apply text-center text-4xl md:text-5xl lg:text-6xl font-playfair text-navy;
 }
 
 .heading-2 {
-  @apply text-3xl md:text-4xl font-playfair text-navy;
+  @apply text-center text-3xl md:text-4xl font-playfair text-navy;
 }
 
 .heading-3 {
