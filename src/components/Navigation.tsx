@@ -67,7 +67,7 @@ const Navigation = () => {
           />
 
           <button
-            className={`md:hidden ${isScrolled ? 'text-navy' : 'text-white'}`}
+            className={`lg:hidden ${isScrolled ? 'text-navy' : 'text-white'}`}
             onClick={toggleMenu}
             aria-label="Toggle menu"
             aria-expanded={isMenuOpen}
