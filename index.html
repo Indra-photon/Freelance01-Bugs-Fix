@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -8,6 +7,28 @@
     <meta name="description" content="Fraterny - Shared Ambitions" />
     <meta name="author" content="Fraterny" />
     <base href="/" />
+    
+    <!-- FONT OPTIMIZATION: Preconnect to Google Fonts (DNS resolution) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- FONT OPTIMIZATION: Load only weights we actually use (reduced from 18 to 5 fonts) -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@400;700&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@400;700&display=swap"></noscript>
+    
+    <!-- CRITICAL CSS: System font fallbacks to prevent FOUC -->
+    <style>
+      /* Prevent Flash of Unstyled Content with system fonts */
+      body { 
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; 
+        font-feature-settings: "rlig" 1, "calt" 1;
+      }
+      .font-playfair { 
+        font-family: 'Playfair Display', Georgia, 'Times New Roman', serif; 
+      }
+    </style>
+    
+    <!-- Existing favicon and meta tags -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
