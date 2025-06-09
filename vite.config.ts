@@ -181,13 +181,7 @@ export default defineConfig(({ mode }) => ({
     // Source maps for development debugging
     devSourcemap: mode === 'development',
     
-    // PostCSS optimization
-    postcss: {
-      plugins: mode === 'production' ? [
-        // Add autoprefixer and cssnano for production
-        require('autoprefixer'),
-      ] : [],
-    },
+    // Let Vite handle PostCSS automatically
   },
   
   // PERFORMANCE: Optimize dependencies in dev mode
