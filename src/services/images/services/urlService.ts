@@ -117,9 +117,28 @@ export const getImageUrlByKey = async (key: string, retryCount = 0): Promise<str
     }
 
     // Get the public URL for this storage path
+    // const { data: urlData } = supabase.storage
+    //   .from('website-images')
+    //   .getPublicUrl(data.storage_path);
+    // 🎯 MOBILE DEVICE DETECTION
+    // Get the public URL for this storage path
     const { data: urlData } = supabase.storage
       .from('website-images')
       .getPublicUrl(data.storage_path);
+
+    if (!urlData || !urlData.publicUrl) {
+      log(`Failed to get public URL for storage path`, { path: data.storage_path });
+      return '/placeholder.svg';
+    }
+
+    // 🎯 MOBILE DEVICE DETECTION
+    const isMobileDevice = typeof window !== 'undefined' && 
+      (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    
+    const isMobileKey = key.includes('-mobile');
+    const shouldOptimizeForMobile = isMobileDevice || isMobileKey;
+
+    log(`🎯 Generated ${shouldOptimizeForMobile ? 'MOBILE' : 'DESKTOP'} optimized URL for ${key}`);
 
     if (!urlData || !urlData.publicUrl) {
       log(`Failed to get public URL for storage path`, { path: data.storage_path });
@@ -216,6 +235,17 @@ export const getImageUrlByKeyAndSize = async (
     // Check if sizes exists and if the requested size is available
     if (data.sizes && data.sizes[size]) {
       // Get the public URL for this optimized size
+      // const { data: urlData } = supabase.storage
+      //   .from('website-images')
+      //   .getPublicUrl(data.sizes[size]);
+
+      // if (!urlData || !urlData.publicUrl) {
+      //   console.warn(`[getImageUrlByKeyAndSize] Failed to get public URL for size path: ${data.sizes[size]}`);
+      //   return '/placeholder.svg';
+      // }
+
+      // 🎯 MOBILE DEVICE DETECTION
+      // Get the public URL for this optimized size
       const { data: urlData } = supabase.storage
         .from('website-images')
         .getPublicUrl(data.sizes[size]);
@@ -224,6 +254,12 @@ export const getImageUrlByKeyAndSize = async (
         console.warn(`[getImageUrlByKeyAndSize] Failed to get public URL for size path: ${data.sizes[size]}`);
         return '/placeholder.svg';
       }
+
+      // 🎯 MOBILE DEVICE DETECTION
+      const isMobileDevice = typeof window !== 'undefined' && 
+        (window.innerWidth <= 768 || /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+      
+      const shouldOptimizeForMobile = isMobileDevice || key.includes('-mobile');
 
       // Build the final URL with enhanced cache parameters
       let finalUrl = urlData.publicUrl;

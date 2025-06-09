@@ -541,8 +541,13 @@ export const useResponsiveImage = (
       // FIXED: Add retry logic with intelligent backoff for mobile networks
       const fetchImageWithRetry = async (retryCount = 0, maxRetries = 3): Promise<void> => {
         try {
+          // const globalVersion = await getGlobalCacheVersion();
+          // const cacheKey = `perfcache:${effectiveKey}:${size || 'original'}:${globalVersion || ''}`;
           const globalVersion = await getGlobalCacheVersion();
-          const cacheKey = `perfcache:${effectiveKey}:${size || 'original'}:${globalVersion || ''}`;
+    
+          // 🎯 MOBILE-SPECIFIC CACHE KEYS
+          const deviceType = isMobile ? 'mobile' : 'desktop';
+          const cacheKey = `perfcache:${effectiveKey}:${deviceType}:${size || 'original'}:${globalVersion || ''}`;
           
           // TIMING: Cache check
           const cacheCheckTime = performance.now();
@@ -616,11 +621,16 @@ export const useResponsiveImage = (
           let imageUrl: string;
           let extractedContentHash = null;
 
-          if (size) {
-            imageUrl = await getImageUrlByKeyAndSize(effectiveKey, size);
-          } else {
-            imageUrl = await getImageUrlByKey(effectiveKey);
-          }
+          // 🎯 MOBILE-AWARE IMAGE URL FETCHING
+        if (size) {
+          // For sized images, prefer mobile versions on mobile devices
+          const mobileSize = isMobile && size === 'large' ? 'medium' : size;
+          imageUrl = await getImageUrlByKeyAndSize(effectiveKey, mobileSize);
+        } else {
+          imageUrl = await getImageUrlByKey(effectiveKey);
+        }
+        
+        console.log(`📱 Fetched ${isMobile ? 'MOBILE' : 'DESKTOP'} URL for ${effectiveKey}: ${imageUrl.substring(0, 60)}...`);
 
           // TIMING: URL fetched
           const urlFetchTime = performance.now();
@@ -638,16 +648,19 @@ export const useResponsiveImage = (
           const aspectRatio = await getImageAspectRatio(imageUrl);
 
           const imageInfo = {
-            url: imageUrl,
-            aspectRatio,
-            tinyPlaceholder,
-            colorPlaceholder,
-            contentHash: extractedContentHash,
-            timestamp: Date.now(),
-            lastUpdated: new Date().toISOString(),
-            globalVersion,
-            networkType: network.effectiveConnectionType
-          };
+          url: imageUrl,
+          aspectRatio,
+          tinyPlaceholder,
+          colorPlaceholder,
+          contentHash: extractedContentHash,
+          timestamp: Date.now(),
+          lastUpdated: new Date().toISOString(),
+          globalVersion,
+          networkType: network.effectiveConnectionType,
+          // 🎯 ADD DEVICE TYPE FOR CACHE VALIDATION
+          deviceType: isMobile ? 'mobile' : 'desktop',
+          estimatedSize: isMobile ? '~200KB' : '~800KB'
+        };
 
           // try {
           //   if (navigator.onLine) {
@@ -657,7 +670,10 @@ export const useResponsiveImage = (
           //   console.warn('Failed to cache image data in sessionStorage:', e);
           // }
           // FIXED: Use robust caching with fallback
-          cacheImageInfo(cacheKey, imageInfo);
+          // FIXED: Use robust caching with fallback and device awareness
+        cacheImageInfo(cacheKey, imageInfo);
+        
+        console.log(`💾 Cached ${deviceType} image info for ${effectiveKey}`);
 
           console.log(`✅ [fetchImage] About to set final state:`, {
             originalKey: dynamicKey,
