@@ -6,13 +6,12 @@ import {
   clearImageUrlCacheForKey,
   getGlobalCacheVersion
 } from '@/services/images';
-import { clearViewportSpecificCache } from '@/services/images/services/cacheService';
 import { toast } from 'sonner';
-import { ImageLoadingState } from './types';
+import { ImageLoadingState, ImageCacheEntry, MemoryCacheEntry } from './types';
 import { useNetworkStatus } from '@/hooks/use-network-status';
 import { useIsMobile } from '@/hooks/use-mobile';
 // FIXED: Memory cache fallback for when sessionStorage fails on mobile devices
-const memoryCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+const memoryCache = new Map<string, MemoryCacheEntry>();
 
 // Helper function to clean expired memory cache entries
 const cleanMemoryCache = () => {
@@ -27,8 +26,26 @@ const cleanMemoryCache = () => {
 // Clean memory cache every 5 minutes
 setInterval(cleanMemoryCache, 5 * 60 * 1000);
 
-// FIXED: Robust caching with fallbacks
-const cacheImageInfo = (cacheKey: string, imageInfo: any): void => {
+// Add a localStorage-based mutex for atomic sessionStorage writes
+const acquireLock = async (lockKey: string): Promise<boolean> => {
+  const lockValue = Date.now().toString();
+  localStorage.setItem(lockKey, lockValue);
+  await new Promise(resolve => setTimeout(resolve, 50)); // Small delay to allow other tabs to detect the lock
+  return localStorage.getItem(lockKey) === lockValue;
+};
+
+const releaseLock = (lockKey: string): void => {
+  localStorage.removeItem(lockKey);
+};
+
+// Refactor cacheImageInfo to use the mutex
+const cacheImageInfo = async (cacheKey: string, imageInfo: ImageCacheEntry): Promise<void> => {
+  const lockKey = `lock:${cacheKey}`;
+  const lockAcquired = await acquireLock(lockKey);
+  if (!lockAcquired) {
+    console.warn('Failed to acquire lock for cache write, skipping cache update');
+    return;
+  }
   try {
     if (navigator.onLine) {
       sessionStorage.setItem(cacheKey, JSON.stringify(imageInfo));
@@ -36,38 +53,49 @@ const cacheImageInfo = (cacheKey: string, imageInfo: any): void => {
     }
   } catch (storageError) {
     console.warn('📱 [Mobile Fix] SessionStorage failed, using memory cache fallback:', storageError);
-    
-    // Fallback to in-memory cache with 10 minute TTL
     memoryCache.set(cacheKey, {
       data: imageInfo,
       timestamp: Date.now(),
       ttl: 10 * 60 * 1000 // 10 minutes
     });
     console.log(`🧠 [Memory Cache] Stored in memory: ${cacheKey}`);
+  } finally {
+    releaseLock(lockKey);
   }
 };
 
-const getCachedImageInfo = (cacheKey: string): any | null => {
-  try {
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached) {
-      console.log(`💾 [Cache Hit] SessionStorage: ${cacheKey}`);
-      return JSON.parse(cached);
-    }
-  } catch (e) {
-    console.warn('📱 [Mobile Fix] SessionStorage read failed, checking memory cache');
-  }
-  
-  // Fallback to memory cache
-  const memoryEntry = memoryCache.get(cacheKey);
-  if (memoryEntry && Date.now() <= memoryEntry.timestamp + memoryEntry.ttl) {
-    console.log(`🧠 [Cache Hit] Memory cache: ${cacheKey}`);
-    return memoryEntry.data;
-  }
-  
-  console.log(`❌ [Cache Miss] No cache found for: ${cacheKey}`);
-  return null;
-};
+// Refactor getCachedImageInfo to use the mutex
+// const getCachedImageInfo = async (cacheKey: string): Promise<ImageCacheEntry | null> => {
+//   const lockKey = `lock:${cacheKey}`;
+//   const lockAcquired = await acquireLock(lockKey);
+//   if (!lockAcquired) {
+//     console.warn('Failed to acquire lock for cache read, falling back to memory cache');
+//     const memoryEntry = memoryCache.get(cacheKey);
+//     if (memoryEntry && Date.now() <= memoryEntry.timestamp + memoryEntry.ttl) {
+//       console.log(`🧠 [Cache Hit] Memory cache: ${cacheKey}`);
+//       return memoryEntry.data;
+//     }
+//     return null;
+//   }
+//   try {
+//     const cached = sessionStorage.getItem(cacheKey);
+//     if (cached) {
+//       console.log(`💾 [Cache Hit] SessionStorage: ${cacheKey}`);
+//       return JSON.parse(cached) as ImageCacheEntry;
+//     }
+//   } catch (e) {
+//     console.warn('📱 [Mobile Fix] SessionStorage read failed, checking memory cache');
+//   } finally {
+//     releaseLock(lockKey);
+//   }
+//   const memoryEntry = memoryCache.get(cacheKey);
+//   if (memoryEntry && Date.now() <= memoryEntry.timestamp + memoryEntry.ttl) {
+//     console.log(`🧠 [Cache Hit] Memory cache: ${cacheKey}`);
+//     return memoryEntry.data;
+//   }
+//   console.log(`❌ [Cache Miss] No cache found for: ${cacheKey}`);
+//   return null;
+// };
 
 // Mobile-specific keys
 // const mobilePreferredKeys = new Set([
@@ -86,6 +114,12 @@ const hasMobileVariant = (key: string): boolean => {
   
   return mobilePatterns.some(pattern => key.startsWith(pattern) || key.includes(pattern));
 };
+
+// Add type for placeholders
+interface ImagePlaceholders {
+  tinyPlaceholder: string | null;
+  colorPlaceholder: string | null;
+}
 
 export const useResponsiveImage = (
   dynamicKey?: string,
@@ -107,51 +141,17 @@ export const useResponsiveImage = (
   const network = useNetworkStatus();
   const isMobile = useIsMobile();
 
-  // Handle viewport changes and clear cache when mobile state changes
-  // useEffect(() => {
-  //   if (isMobile !== undefined && dynamicKey) {
-  //     // Clear cache for this specific key when viewport changes
-  //     clearImageUrlCacheForKey(dynamicKey);
-      
-  //     // Also clear any cached session storage for this image
-  //     const globalVersion = getGlobalCacheVersion();
-  //     globalVersion.then(version => {
-  //       const cacheKey = `perfcache:${dynamicKey}:${size || 'original'}:${version || ''}`;
-  //       const mobileKey = `${dynamicKey}-mobile`;
-  //       const mobileCacheKey = `perfcache:${mobileKey}:${size || 'original'}:${version || ''}`;
-        
-  //       try {
-  //         sessionStorage.removeItem(cacheKey);
-  //         sessionStorage.removeItem(mobileCacheKey);
-  //       } catch (e) {
-  //         console.warn('Could not clear session storage cache:', e);
-  //       }
-  //     });
-  //   }
-  // }, [isMobile]); // Only run when isMobile changes
-  // Handle viewport changes - only clear cache on actual changes, not initial load
-  // useEffect(() => {
-  //   // Only process if we have a dynamicKey and mobile state is defined
-  //   if (isMobile !== undefined && dynamicKey) {
-  //     const storageKey = `mobile_state_${dynamicKey}`;
-  //     const previousMobileState = sessionStorage.getItem(storageKey);
-      
-  //     console.log(`📱 [Viewport Change] isMobile: ${isMobile} for ${dynamicKey}, previous: ${previousMobileState}`);
-      
-  //     // Only clear cache if this is a REAL viewport change
-  //     if (previousMobileState !== null && previousMobileState !== String(isMobile)) {
-  //       console.log(`🧹 [Cache Clear] Viewport actually changed from ${previousMobileState} to ${isMobile}, clearing cache for ${dynamicKey}`);
-  //       clearImageUrlCacheForKey(dynamicKey);
-  //     } else if (previousMobileState === null) {
-  //       console.log(`📝 [Initial Load] First time loading ${dynamicKey}, no cache clear needed`);
-  //     } else {
-  //       console.log(`⚡ [No Change] Mobile state unchanged for ${dynamicKey}, keeping cache`);
-  //     }
-      
-  //     // Store current state for future comparisons
-  //     sessionStorage.setItem(storageKey, String(isMobile));
-  //   }
-  // }, [isMobile, dynamicKey]); // Include dynamicKey but only clear on real changes
+  // Listen for cross-tab cache version changes
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'global_cache_version') {
+        console.log('Global cache version changed, invalidating local cache');
+        clearImageUrlCacheForKey(e.key);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // FIXED: Smart viewport change detection that doesn't over-clear cache
   useEffect(() => {
@@ -242,514 +242,119 @@ export const useResponsiveImage = (
       clearImageUrlCacheForKey(effectiveKey);
     }
 
-    // const fetchImage = async () => {
-    //   try {
-    //     const globalVersion = await getGlobalCacheVersion();
-    //     const cacheKey = `perfcache:${effectiveKey}:${size || 'original'}:${globalVersion || ''}`;
-    //     const cachedData = navigator.onLine ? sessionStorage.getItem(cacheKey) : null;
+    // FIXED: Improved fetchImageWithRetry with better error handling
+    const fetchImageWithRetry = async (
+      key: string,
+      size?: 'small' | 'medium' | 'large',
+      attempt = 1,
+      startTime = Date.now()
+    ): Promise<ImageCacheEntry> => {
+      const maxRetries = 4;
+      const baseDelay = 500;
+      const maxDelay = 2000;
+      const jitter = Math.random() * 0.3 + 0.85; // 0.85-1.15
 
-    //     let cachedImageInfo: any = null;
-    //     const cacheExpiryTime = ['slow-2g', '2g', '3g'].includes(network.effectiveConnectionType)
-    //       ? 15 * 60 * 1000
-    //       : 5 * 60 * 1000;
-
-    //     if (cachedData) {
-    //       try {
-    //         const parsed = JSON.parse(cachedData);
-    //         const cacheAge = Date.now() - parsed.timestamp;
-    //         if (cacheAge < cacheExpiryTime) {
-    //           cachedImageInfo = parsed;
-    //           if (debugCache) console.log(`Using cached image data for ${effectiveKey}`);
-    //         }
-    //       } catch (e) {
-    //         console.error('Error parsing cached image data:', e);
-    //       }
-    //     }
-
-    //     let tinyPlaceholder = null;
-    //     let colorPlaceholder = null;
-
-    //     if (['slow-2g', '2g'].includes(network.effectiveConnectionType)) {
-    //       const placeholders = await getImagePlaceholdersByKey(effectiveKey);
-    //       tinyPlaceholder = placeholders.tinyPlaceholder;
-    //       colorPlaceholder = placeholders.colorPlaceholder;
-
-    //       if (tinyPlaceholder) {
-    //         setState(prev => ({
-    //           ...prev,
-    //           tinyPlaceholder,
-    //           colorPlaceholder,
-    //         }));
-    //       }
-    //     }
-
-    //     if (cachedImageInfo) {
-    //       setState(prev => ({
-    //         ...prev,
-    //         dynamicSrc: cachedImageInfo.url,
-    //         isLoading: false,
-    //         aspectRatio: cachedImageInfo.aspectRatio,
-    //         tinyPlaceholder: cachedImageInfo.tinyPlaceholder || prev.tinyPlaceholder,
-    //         colorPlaceholder: cachedImageInfo.colorPlaceholder || prev.colorPlaceholder,
-    //         contentHash: cachedImageInfo.contentHash,
-    //         isCached: true,
-    //         lastUpdated: cachedImageInfo.lastUpdated
-    //       }));
-    //       return;
-    //     }
-
-    //     if (debugCache) console.log(`Fetching image with key: ${effectiveKey}, size: ${size || 'original'}`);
-
-    //     const placeholdersPromise = !tinyPlaceholder ? getImagePlaceholdersByKey(effectiveKey) : Promise.resolve({ tinyPlaceholder, colorPlaceholder });
-
-    //     let imageUrl: string;
-    //     let extractedContentHash = null;
-
-    //     if (size) {
-    //       imageUrl = await getImageUrlByKeyAndSize(effectiveKey, size);
-    //     } else {
-    //       imageUrl = await getImageUrlByKey(effectiveKey);
-    //     }
-
-    //     try {
-    //       const urlObj = new URL(imageUrl);
-    //       extractedContentHash = urlObj.searchParams.get('v') || null;
-    //     } catch (err) {}
-
-    //     const { tinyPlaceholder: tp, colorPlaceholder: cp } = await placeholdersPromise;
-    //     tinyPlaceholder = tinyPlaceholder || tp;
-    //     colorPlaceholder = colorPlaceholder || cp;
-
-    //     const aspectRatio = await getImageAspectRatio(imageUrl);
-
-    //     const imageInfo = {
-    //       url: imageUrl,
-    //       aspectRatio,
-    //       tinyPlaceholder,
-    //       colorPlaceholder,
-    //       contentHash: extractedContentHash,
-    //       timestamp: Date.now(),
-    //       lastUpdated: new Date().toISOString(),
-    //       globalVersion,
-    //       networkType: network.effectiveConnectionType
-    //     };
-
-    //     try {
-    //       if (navigator.onLine) {
-    //         sessionStorage.setItem(cacheKey, JSON.stringify(imageInfo));
-    //       }
-    //     } catch (e) {
-    //       console.warn('Failed to cache image data in sessionStorage:', e);
-    //     }
-
-    //     setState(prev => ({
-    //       ...prev,
-    //       dynamicSrc: imageUrl,
-    //       isLoading: false,
-    //       aspectRatio,
-    //       tinyPlaceholder,
-    //       colorPlaceholder,
-    //       contentHash: extractedContentHash,
-    //       isCached: false,
-    //       lastUpdated: imageInfo.lastUpdated
-    //     }));
-    //   } catch (error) {
-    //     console.error(`Failed to load image with key ${dynamicKey}:`, error);
-    //     setState(prev => ({ ...prev, error: true, isLoading: false }));
-
-    //     if (!['hero-', 'pricing-', 'process-', 'experience-'].some(k => dynamicKey?.includes(k))) {
-    //       toast.error(`Failed to load image: ${dynamicKey}`, {
-    //         description: "Please check if this image exists in your storage.",
-    //         duration: 3000,
-    //       });
-    //     }
-    //   }
-    // };
-      const fetchImage = async () => {
-      // ADD PERFORMANCE TIMING:
-      const startTime = performance.now();
-      console.log(`⏱️ [Performance] Starting fetch for ${effectiveKey} at ${startTime}ms`);
-
-      // ADD THIS DEBUG LOG:
-      console.log(`🚀 [fetchImage] Starting fetch for:`, {
-        originalKey: dynamicKey,
-        effectiveKey,
-        isMobile,
-        size: size || 'original',
-        timestamp: new Date().toISOString()
-      });
-
-      // try {
-      //   const globalVersion = await getGlobalCacheVersion();
-      //   const cacheKey = `perfcache:${effectiveKey}:${size || 'original'}:${globalVersion || ''}`;
+      try {
+        console.log(`⏱️ [Performance] Starting network request at ${Date.now() - startTime}ms (attempt ${attempt})`);
         
-      //   // TIMING: Cache check
-      //   const cacheCheckTime = performance.now();
-      //   console.log(`⏱️ [Performance] Cache check completed at ${cacheCheckTime - startTime}ms`);
-        
-      //   const cachedData = navigator.onLine ? sessionStorage.getItem(cacheKey) : null;
-
-      //   // let cachedImageInfo: any = null;
-      //   // const cacheExpiryTime = ['slow-2g', '2g', '3g'].includes(network.effectiveConnectionType)
-      //   //   ? 15 * 60 * 1000
-      //   //   : 5 * 60 * 1000;
-      //   let cachedImageInfo: any = null;
-      //   // FIXED: Don't penalize 3G networks - only truly slow connections get longer cache
-      //   const cacheExpiryTime = ['slow-2g', '2g'].includes(network.effectiveConnectionType)
-      //     ? 15 * 60 * 1000  // 15 minutes for truly slow connections
-      //     : 5 * 60 * 1000;  // 5 minutes for 3G, 4G, and unknown connections
-
-      //   if (cachedData) {
-      //     try {
-      //       const parsed = JSON.parse(cachedData);
-      //       const cacheAge = Date.now() - parsed.timestamp;
-      //       if (cacheAge < cacheExpiryTime) {
-      //         cachedImageInfo = parsed;
-      //         if (debugCache) console.log(`Using cached image data for ${effectiveKey}`);
-      //       }
-      //     } catch (e) {
-      //       console.error('Error parsing cached image data:', e);
-      //     }
-      //   }
-
-      //   let tinyPlaceholder = null;
-      //   let colorPlaceholder = null;
-
-      //   if (['slow-2g', '2g'].includes(network.effectiveConnectionType)) {
-      //     const placeholders = await getImagePlaceholdersByKey(effectiveKey);
-      //     tinyPlaceholder = placeholders.tinyPlaceholder;
-      //     colorPlaceholder = placeholders.colorPlaceholder;
-
-      //     if (tinyPlaceholder) {
-      //       setState(prev => ({
-      //         ...prev,
-      //         tinyPlaceholder,
-      //         colorPlaceholder,
-      //       }));
-      //     }
-      //   }
-
-      //   if (cachedImageInfo) {
-      //     const cacheHitTime = performance.now();
-      //     console.log(`⏱️ [Performance] Cache HIT! Total time: ${cacheHitTime - startTime}ms`);
-          
-      //     setState(prev => ({
-      //       ...prev,
-      //       dynamicSrc: cachedImageInfo.url,
-      //       isLoading: false,
-      //       aspectRatio: cachedImageInfo.aspectRatio,
-      //       tinyPlaceholder: cachedImageInfo.tinyPlaceholder || prev.tinyPlaceholder,
-      //       colorPlaceholder: cachedImageInfo.colorPlaceholder || prev.colorPlaceholder,
-      //       contentHash: cachedImageInfo.contentHash,
-      //       isCached: true,
-      //       lastUpdated: cachedImageInfo.lastUpdated
-      //     }));
-      //     return;
-      //   }
-
-      //   // TIMING: Network request start
-      //   const networkStartTime = performance.now();
-      //   console.log(`⏱️ [Performance] Starting network request at ${networkStartTime - startTime}ms`);
-
-      //   if (debugCache) console.log(`Fetching image with key: ${effectiveKey}, size: ${size || 'original'}`);
-
-      //   const placeholdersPromise = !tinyPlaceholder ? getImagePlaceholdersByKey(effectiveKey) : Promise.resolve({ tinyPlaceholder, colorPlaceholder });
-
-      //   let imageUrl: string;
-      //   let extractedContentHash = null;
-
-      //   if (size) {
-      //     imageUrl = await getImageUrlByKeyAndSize(effectiveKey, size);
-      //   } else {
-      //     imageUrl = await getImageUrlByKey(effectiveKey);
-      //   }
-
-      //   // TIMING: URL fetched
-      //   const urlFetchTime = performance.now();
-      //   console.log(`⏱️ [Performance] URL fetched at ${urlFetchTime - startTime}ms: ${imageUrl}`);
-
-      //   try {
-      //     const urlObj = new URL(imageUrl);
-      //     extractedContentHash = urlObj.searchParams.get('v') || null;
-      //   } catch (err) {}
-
-      //   const { tinyPlaceholder: tp, colorPlaceholder: cp } = await placeholdersPromise;
-      //   tinyPlaceholder = tinyPlaceholder || tp;
-      //   colorPlaceholder = colorPlaceholder || cp;
-
-      //   const aspectRatio = await getImageAspectRatio(imageUrl);
-
-      //   const imageInfo = {
-      //     url: imageUrl,
-      //     aspectRatio,
-      //     tinyPlaceholder,
-      //     colorPlaceholder,
-      //     contentHash: extractedContentHash,
-      //     timestamp: Date.now(),
-      //     lastUpdated: new Date().toISOString(),
-      //     globalVersion,
-      //     networkType: network.effectiveConnectionType
-      //   };
-
-      //   try {
-      //     if (navigator.onLine) {
-      //       sessionStorage.setItem(cacheKey, JSON.stringify(imageInfo));
-      //     }
-      //   } catch (e) {
-      //     console.warn('Failed to cache image data in sessionStorage:', e);
-      //   }
-
-      //   // ADD THIS DEBUG LOG BEFORE THE FINAL setState:
-      //   console.log(`✅ [fetchImage] About to set final state:`, {
-      //     originalKey: dynamicKey,
-      //     effectiveKey,
-      //     imageUrl,
-      //     isMobile,
-      //     timestamp: new Date().toISOString()
-      //   });
-
-      //   // TIMING: Complete
-      //   const completeTime = performance.now();
-      //   console.log(`⏱️ [Performance] COMPLETE! Total time: ${completeTime - startTime}ms for ${effectiveKey}`);
-
-      //   setState(prev => ({
-      //     ...prev,
-      //     dynamicSrc: imageUrl,
-      //     isLoading: false,
-      //     aspectRatio,
-      //     tinyPlaceholder,
-      //     colorPlaceholder,
-      //     contentHash: extractedContentHash,
-      //     isCached: false,
-      //     lastUpdated: imageInfo.lastUpdated
-      //   }));
-      // } catch (error) {
-      //   const errorTime = performance.now();
-      //   console.log(`⏱️ [Performance] ERROR at ${errorTime - startTime}ms:`, error);
-        
-      //   console.error(`Failed to load image with key ${dynamicKey}:`, error);
-      //   setState(prev => ({ ...prev, error: true, isLoading: false }));
-
-      //   if (!['hero-', 'pricing-', 'process-', 'experience-'].some(k => dynamicKey?.includes(k))) {
-      //     toast.error(`Failed to load image: ${dynamicKey}`, {
-      //       description: "Please check if this image exists in your storage.",
-      //       duration: 3000,
-      //     });
-      //   }
-      // }
-
-      // FIXED: Add retry logic with intelligent backoff for mobile networks
-      const fetchImageWithRetry = async (retryCount = 0, maxRetries = 3): Promise<void> => {
+        // Get URL with proper error handling
+        let url: string | undefined;
         try {
-          // const globalVersion = await getGlobalCacheVersion();
-          // const cacheKey = `perfcache:${effectiveKey}:${size || 'original'}:${globalVersion || ''}`;
-          const globalVersion = await getGlobalCacheVersion();
-    
-          // 🎯 MOBILE-SPECIFIC CACHE KEYS
-          const deviceType = isMobile ? 'mobile' : 'desktop';
-          const cacheKey = `perfcache:${effectiveKey}:${deviceType}:${size || 'original'}:${globalVersion || ''}`;
-          
-          // TIMING: Cache check
-          const cacheCheckTime = performance.now();
-          console.log(`⏱️ [Performance] Cache check completed at ${cacheCheckTime - startTime}ms`);
-          
-          // const cachedData = navigator.onLine ? sessionStorage.getItem(cacheKey) : null;
-          const cachedData = navigator.onLine ? sessionStorage.getItem(cacheKey) : null;
-
-          let cachedImageInfo: any = null;
-          // FIXED: Don't penalize 3G networks - only truly slow connections get longer cache
-          const cacheExpiryTime = ['slow-2g', '2g'].includes(network.effectiveConnectionType)
-            ? 15 * 60 * 1000  // 15 minutes for truly slow connections
-            : 5 * 60 * 1000;  // 5 minutes for 3G, 4G, and unknown connections
-
-          if (cachedData) {
-            try {
-              const parsed = JSON.parse(cachedData);
-              const cacheAge = Date.now() - parsed.timestamp;
-              if (cacheAge < cacheExpiryTime) {
-                cachedImageInfo = parsed;
-                if (debugCache) console.log(`Using cached image data for ${effectiveKey}`);
-              }
-            } catch (e) {
-              console.error('Error parsing cached image data:', e);
-            }
-          }
-
-          let tinyPlaceholder = null;
-          let colorPlaceholder = null;
-
-          if (['slow-2g', '2g'].includes(network.effectiveConnectionType)) {
-            const placeholders = await getImagePlaceholdersByKey(effectiveKey);
-            tinyPlaceholder = placeholders.tinyPlaceholder;
-            colorPlaceholder = placeholders.colorPlaceholder;
-
-            if (tinyPlaceholder) {
-              setState(prev => ({
-                ...prev,
-                tinyPlaceholder,
-                colorPlaceholder,
-              }));
-            }
-          }
-
-          if (cachedImageInfo) {
-            const cacheHitTime = performance.now();
-            console.log(`⏱️ [Performance] Cache HIT! Total time: ${cacheHitTime - startTime}ms`);
-            
-            setState(prev => ({
-              ...prev,
-              dynamicSrc: cachedImageInfo.url,
-              isLoading: false,
-              aspectRatio: cachedImageInfo.aspectRatio,
-              tinyPlaceholder: cachedImageInfo.tinyPlaceholder || prev.tinyPlaceholder,
-              colorPlaceholder: cachedImageInfo.colorPlaceholder || prev.colorPlaceholder,
-              contentHash: cachedImageInfo.contentHash,
-              isCached: true,
-              lastUpdated: cachedImageInfo.lastUpdated
-            }));
-            return;
-          }
-
-          // TIMING: Network request start
-          const networkStartTime = performance.now();
-          console.log(`⏱️ [Performance] Starting network request at ${networkStartTime - startTime}ms (attempt ${retryCount + 1})`);
-
-          if (debugCache) console.log(`Fetching image with key: ${effectiveKey}, size: ${size || 'original'}`);
-
-          const placeholdersPromise = !tinyPlaceholder ? getImagePlaceholdersByKey(effectiveKey) : Promise.resolve({ tinyPlaceholder, colorPlaceholder });
-
-          let imageUrl: string;
-          let extractedContentHash = null;
-
-          // 🎯 MOBILE-AWARE IMAGE URL FETCHING
-        if (size) {
-          // For sized images, prefer mobile versions on mobile devices
-          const mobileSize = isMobile && size === 'large' ? 'medium' : size;
-          imageUrl = await getImageUrlByKeyAndSize(effectiveKey, mobileSize);
-        } else {
-          imageUrl = await getImageUrlByKey(effectiveKey);
+          url = size 
+            ? await getImageUrlByKeyAndSize(key, size)
+            : await getImageUrlByKey(key);
+        } catch (urlError) {
+          console.error(`❌ [URL Error] Failed to get URL for ${key}:`, urlError);
+          throw new Error(`Failed to get URL: ${urlError instanceof Error ? urlError.message : 'Unknown error'}`);
         }
-        
-        console.log(`📱 Fetched ${isMobile ? 'MOBILE' : 'DESKTOP'} URL for ${effectiveKey}: ${imageUrl.substring(0, 60)}...`);
 
-          // TIMING: URL fetched
-          const urlFetchTime = performance.now();
-          console.log(`⏱️ [Performance] URL fetched at ${urlFetchTime - startTime}ms: ${imageUrl}`);
+        // Validate URL
+        if (!url) {
+          throw new Error(`No URL returned for image key: ${key}`);
+        }
 
-          try {
-            const urlObj = new URL(imageUrl);
-            extractedContentHash = urlObj.searchParams.get('v') || null;
-          } catch (err) {}
+        // Validate URL format
+        if (!url.startsWith('http://') && !url.startsWith('https://')) {
+          throw new Error(`Invalid URL format for ${key}: ${url}`);
+        }
 
-          const { tinyPlaceholder: tp, colorPlaceholder: cp } = await placeholdersPromise;
-          tinyPlaceholder = tinyPlaceholder || tp;
-          colorPlaceholder = colorPlaceholder || cp;
+        // Get placeholders with proper error handling
+        let placeholders: ImagePlaceholders;
+        try {
+          placeholders = await getImagePlaceholdersByKey(key);
+        } catch (placeholderError) {
+          console.warn(`⚠️ [Placeholder Error] Using fallback for ${key}:`, placeholderError);
+          placeholders = {
+            tinyPlaceholder: null,
+            colorPlaceholder: null
+          };
+        }
 
-          const aspectRatio = await getImageAspectRatio(imageUrl);
+        // Get global version
+        const globalVersion = await getGlobalCacheVersion();
 
-          const imageInfo = {
-          url: imageUrl,
-          aspectRatio,
-          tinyPlaceholder,
-          colorPlaceholder,
-          contentHash: extractedContentHash,
+        // Create image entry
+        const imageEntry: ImageCacheEntry = {
+          url,
+          aspectRatio: undefined, // Will be updated when image loads
+          tinyPlaceholder: placeholders.tinyPlaceholder,
+          colorPlaceholder: placeholders.colorPlaceholder,
+          contentHash: null, // Will be updated when image loads
+          lastUpdated: new Date().toISOString(), // Convert to string
           timestamp: Date.now(),
-          lastUpdated: new Date().toISOString(),
           globalVersion,
           networkType: network.effectiveConnectionType,
-          // 🎯 ADD DEVICE TYPE FOR CACHE VALIDATION
           deviceType: isMobile ? 'mobile' : 'desktop',
           estimatedSize: isMobile ? '~200KB' : '~800KB'
         };
 
-          // try {
-          //   if (navigator.onLine) {
-          //     sessionStorage.setItem(cacheKey, JSON.stringify(imageInfo));
-          //   }
-          // } catch (e) {
-          //   console.warn('Failed to cache image data in sessionStorage:', e);
-          // }
-          // FIXED: Use robust caching with fallback
-          // FIXED: Use robust caching with fallback and device awareness
-        cacheImageInfo(cacheKey, imageInfo);
-        
-        console.log(`💾 Cached ${deviceType} image info for ${effectiveKey}`);
+        // Cache the entry
+        await cacheImageInfo(key, imageEntry);
+        console.log(`✅ [Success] Image loaded and cached: ${key}`);
 
-          console.log(`✅ [fetchImage] About to set final state:`, {
-            originalKey: dynamicKey,
-            effectiveKey,
-            imageUrl,
-            isMobile,
-            timestamp: new Date().toISOString()
-          });
+        return imageEntry;
 
-          // TIMING: Complete
-          const completeTime = performance.now();
-          console.log(`⏱️ [Performance] COMPLETE! Total time: ${completeTime - startTime}ms for ${effectiveKey}`);
+      } catch (error) {
+        console.error(`❌ [Retry ${attempt}/${maxRetries}] Error at ${Date.now() - startTime}ms for ${key}:`, error);
 
-          setState(prev => ({
-            ...prev,
-            dynamicSrc: imageUrl,
-            isLoading: false,
-            aspectRatio,
-            tinyPlaceholder,
-            colorPlaceholder,
-            contentHash: extractedContentHash,
-            isCached: false,
-            lastUpdated: imageInfo.lastUpdated
-          }));
-
-        } catch (error) {
-          const errorTime = performance.now();
-          console.error(`❌ [Retry ${retryCount + 1}/${maxRetries + 1}] Error at ${errorTime - startTime}ms for ${effectiveKey}:`, error);
-          
-          // Determine if we should retry based on error type and network
-          const isNetworkError = error instanceof TypeError || 
-                                error.message?.includes('fetch') || 
-                                error.message?.includes('network') ||
-                                error.name === 'NetworkError';
-          
-          const shouldRetry = retryCount < maxRetries && 
-                             isNetworkError && 
-                             navigator.onLine;
-          
-          if (shouldRetry) {
-            // Smart backoff - shorter delays on mobile networks to prevent long waits
-            const isMobileNetwork = ['3g', '4g'].includes(network.effectiveConnectionType);
-            const baseDelay = isMobileNetwork ? 500 : 1000; // Shorter delays for mobile
-            const delay = baseDelay * Math.pow(1.5, retryCount); // Gentler exponential backoff
-            
-            console.log(`🔄 [Retry] Retrying ${effectiveKey} in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`);
-            
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return fetchImageWithRetry(retryCount + 1, maxRetries);
-          }
-          
-          // Final failure after all retries
-          console.error(`💥 [Final Failure] Failed to load image ${dynamicKey} after ${retryCount + 1} attempts:`, error);
-          setState(prev => ({ ...prev, error: true, isLoading: false }));
-
-          if (!['hero-', 'pricing-', 'process-', 'experience-'].some(k => dynamicKey?.includes(k))) {
-            toast.error(`Failed to load image: ${dynamicKey}`, {
-              description: `Network error after ${retryCount + 1} attempts. Please check your connection.`,
-              duration: 3000,
-            });
-          }
+        if (attempt < maxRetries) {
+          const delay = Math.min(baseDelay * Math.pow(2, attempt - 1) * jitter, maxDelay);
+          console.log(`🔄 [Retry] Retrying ${key} in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return fetchImageWithRetry(key, size, attempt + 1, startTime);
         }
-      };
 
-      // Start the fetch with retry logic
-      await fetchImageWithRetry();
+        console.error(`💥 [Final Failure] Failed to load image ${key} after ${maxRetries} attempts:`, error);
+        throw error;
+      }
     };
-    // const delay = !navigator.onLine || ['slow-2g', '2g'].includes(network.effectiveConnectionType)
-    //   ? 300 : 0;
-    // ADD PRIORITY LOGIC FOR HERO IMAGE:
-    // const isHeroImage = dynamicKey?.includes('hero-background');
-    // const delay = !navigator.onLine || ['slow-2g', '2g'].includes(network.effectiveConnectionType)
-    //   ? (isHeroImage ? 0 : 300)  // No delay for hero images
-    //   : (isHeroImage ? 0 : 100); // Small delay for non-hero to prioritize hero
 
-    // console.log(`🚀 [Priority] ${effectiveKey} is hero: ${isHeroImage}, delay: ${delay}ms`);
+    // Update the fetch function to use the new fetchImageWithRetry
+    const fetchImage = async (key: string, size?: 'small' | 'medium' | 'large'): Promise<void> => {
+      try {
+        const imageEntry = await fetchImageWithRetry(key, size);
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: false,
+          dynamicSrc: imageEntry.url,
+          aspectRatio: imageEntry.aspectRatio,
+          tinyPlaceholder: imageEntry.tinyPlaceholder,
+          colorPlaceholder: imageEntry.colorPlaceholder,
+          contentHash: imageEntry.contentHash,
+          isCached: true,
+          lastUpdated: imageEntry.lastUpdated
+        }));
+      } catch (error) {
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: true
+        }));
+        toast.error(`Failed to load image: ${key}`);
+      }
+    };
+
     // FIXED: Remove arbitrary delays and prioritize based on image importance
     const isHeroImage = dynamicKey?.includes('hero-background');
     const isCriticalImage = isHeroImage || dynamicKey?.includes('hero-') || 
@@ -763,23 +368,38 @@ export const useResponsiveImage = (
 
     console.log(`🚀 [Priority] ${effectiveKey} is critical: ${isCriticalImage}, connection: ${network.effectiveConnectionType}, delay: ${delay}ms`);
 
-    const timeoutId = setTimeout(fetchImage, delay);
+    const startTime = performance.now();
+    console.log(`⏱️ [Performance] Starting image load for ${effectiveKey} at ${startTime}ms`);
+
+    // Add a small delay to prevent rapid re-renders
+    const smallDelay = 100;
+    const timeoutId = setTimeout(() => {
+      fetchImage(effectiveKey, size).catch(error => {
+        console.error('Error in fetchImage:', error);
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: true
+        }));
+      });
+    }, smallDelay);
+
     return () => clearTimeout(timeoutId);
   }, [dynamicKey, size, debugCache, network.online, network.effectiveConnectionType, isMobile]);
 
   return state;
 };
 
-const getImageAspectRatio = (url: string): Promise<number | undefined> => {
-  return new Promise(resolve => {
-    if (url === '/placeholder.svg') {
-      resolve(16 / 9);
-      return;
-    }
+// const getImageAspectRatio = (url: string): Promise<number | undefined> => {
+//   return new Promise(resolve => {
+//     if (url === '/placeholder.svg') {
+//       resolve(16 / 9);
+//       return;
+//     }
 
-    const img = new Image();
-    img.onload = () => resolve(img.width / img.height);
-    img.onerror = () => resolve(undefined);
-    img.src = url;
-  });
-};
+//     const img = new Image();
+//     img.onload = () => resolve(img.width / img.height);
+//     img.onerror = () => resolve(undefined);
+//     img.src = url;
+//   });
+// };
