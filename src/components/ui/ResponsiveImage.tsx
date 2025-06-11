@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { getImageUrlByKey } from '@/services/images/services/urlService';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -8,6 +8,7 @@ interface ResponsiveImageProps {
   className?: string;
   loading?: 'lazy' | 'eager';
   priority?: boolean;
+  sizes?: string;
 }
 
 const ResponsiveImage: React.FC<ResponsiveImageProps> = ({
@@ -15,37 +16,71 @@ const ResponsiveImage: React.FC<ResponsiveImageProps> = ({
   alt,
   className = '',
   loading = 'lazy',
-  priority = false
+  priority = false,
+  sizes = '100vw'
 }) => {
   const [imageUrl, setImageUrl] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
   const isMobile = useIsMobile();
 
+  // Load image URL
   useEffect(() => {
+    let mounted = true;
+    
     const loadImage = async () => {
       try {
-        setIsLoading(true);
         const deviceKey = isMobile
           ? dynamicKey.endsWith('-mobile') ? dynamicKey : `${dynamicKey}-mobile`
           : dynamicKey;
+        
         const url = await getImageUrlByKey(deviceKey);
         
-        if (url && url !== '/placeholder.svg') {
-          setImageUrl(url);
-        } else {
-          setError(true);
+        if (mounted) {
+          if (url && url !== '/placeholder.svg') {
+            setImageUrl(url);
+          } else {
+            setError(true);
+          }
         }
       } catch (err) {
         console.error('Error loading image:', err);
-        setError(true);
+        if (mounted) {
+          setError(true);
+        }
       } finally {
-        setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadImage();
+    
+    return () => {
+      mounted = false;
+    };
   }, [dynamicKey, isMobile]);
+
+  // Memoize image attributes
+  const imageAttributes = useMemo(() => {
+    const attrs: React.ImgHTMLAttributes<HTMLImageElement> = {
+      src: imageUrl,
+      alt,
+      className: `${className} ${isLoading ? 'animate-pulse bg-gray-200' : ''}`,
+      loading: priority ? 'eager' : loading,
+      decoding: priority ? 'sync' : 'async',
+      sizes,
+      onLoad: () => setIsLoading(false)
+    };
+
+    // Add fetchpriority as a data attribute to avoid React warning
+    if (priority) {
+      (attrs as any)['data-fetchpriority'] = 'high';
+    }
+
+    return attrs;
+  }, [imageUrl, alt, className, isLoading, loading, priority, sizes]);
 
   if (error) {
     return (
@@ -55,17 +90,7 @@ const ResponsiveImage: React.FC<ResponsiveImageProps> = ({
     );
   }
 
-  return (
-    <img
-      src={imageUrl}
-      alt={alt}
-      className={`${className} ${isLoading ? 'animate-pulse bg-gray-200' : ''}`}
-      loading={loading}
-      fetchPriority={priority ? 'high' : 'auto'}
-      decoding={priority ? 'sync' : 'async'}
-      onLoad={() => setIsLoading(false)}
-    />
-  );
+  return <img {...imageAttributes} />;
 };
 
 export default ResponsiveImage;

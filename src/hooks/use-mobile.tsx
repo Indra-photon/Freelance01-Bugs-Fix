@@ -1,4 +1,3 @@
-
 // import * as React from "react"
 
 // const MOBILE_BREAKPOINT = 768
@@ -22,6 +21,22 @@
 import * as React from "react"
 
 const MOBILE_BREAKPOINT = 768
+const DEBOUNCE_DELAY = 100 // ms
+
+// Simple debounce function
+function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): (...args: Parameters<T>) => void {
+  let timeout: NodeJS.Timeout | null = null;
+  
+  return function(...args: Parameters<T>) {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(() => func(...args), wait);
+  };
+}
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean | undefined>(() => {
@@ -30,22 +45,27 @@ export function useIsMobile() {
       return window.innerWidth < MOBILE_BREAKPOINT;
     }
     return undefined; // SSR case
-  })
+  });
 
   React.useEffect(() => {
     // Only set up listener after initial mount
-    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
     
-    const onChange = () => {
+    const handleChange = () => {
       const newIsMobile = window.innerWidth < MOBILE_BREAKPOINT;
-      console.log(`📱 [useIsMobile] Viewport changed:`, {
-        oldValue: isMobile,
-        newValue: newIsMobile,
-        innerWidth: window.innerWidth,
-        timestamp: new Date().toISOString()
-      });
-      setIsMobile(newIsMobile);
-    }
+      if (newIsMobile !== isMobile) {
+        console.log(`📱 [useIsMobile] Viewport changed:`, {
+          oldValue: isMobile,
+          newValue: newIsMobile,
+          innerWidth: window.innerWidth,
+          timestamp: new Date().toISOString()
+        });
+        setIsMobile(newIsMobile);
+      }
+    };
+    
+    // Debounce the change handler
+    const debouncedChange = debounce(handleChange, DEBOUNCE_DELAY);
     
     // Set initial value if not already set
     if (isMobile === undefined) {
@@ -58,9 +78,9 @@ export function useIsMobile() {
       setIsMobile(initialValue);
     }
     
-    mql.addEventListener("change", onChange)
-    return () => mql.removeEventListener("change", onChange)
-  }, []) // Remove isMobile from dependency array
+    mql.addEventListener("change", debouncedChange);
+    return () => mql.removeEventListener("change", debouncedChange);
+  }, [isMobile]); // Add isMobile to dependency array to check for actual changes
 
-  return isMobile
+  return isMobile;
 }

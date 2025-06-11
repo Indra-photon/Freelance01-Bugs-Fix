@@ -14,8 +14,23 @@ const MAX_RETRIES = 3;
 
 // Basic logging
 const log = (message: string, data?: any) => {
+  // Skip logging for common operations in development
   if (isDevelopment) {
-    console.log(`[ImageCache] ${message}`, data);
+    // Skip logging for cached URLs and cache management
+    if (message.includes('Using cached URL') || 
+        message.includes('Cache managed') ||
+        message.includes('Generated') ||
+        message.includes('Retrieved URL')) {
+      return;
+    }
+    
+    // Only log important events
+    if (message.includes('Error') || 
+        message.includes('No image') || 
+        message.includes('Failed') ||
+        message.includes('Fallback')) {
+      console.log(`[ImageCache] ${message}`, data);
+    }
   }
 };
 
@@ -37,8 +52,6 @@ const manageCache = async () => {
     const entriesToRemove = entries.slice(0, Math.floor(MAX_CACHE_SIZE * 0.2)); // Remove 20% of oldest entries
     entriesToRemove.forEach(([key]) => urlCache.delete(key));
   }
-  
-  log('Cache managed', { currentVersion, size: urlCache.size });
 };
 
 // Improved TTL strategy
@@ -117,7 +130,7 @@ export const getImageUrlByKey = async (key: string, retryCount = 0): Promise<str
         log(`Desktop key ${key} not found, trying mobile fallback: ${fallbackKey}`);
       }
       
-      // Attempt fallback if we have one
+      // Attempt fallback if we have one and haven't tried it yet
       if (fallbackKey && retryCount === 0) {
         log(`Attempting fallback with key: ${fallbackKey}`);
         try {

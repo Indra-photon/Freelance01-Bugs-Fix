@@ -5,36 +5,36 @@ import { scheduleAtMidnight, calculateDaysLeft as utilsCalculateDaysLeft } from 
 import { useReactQueryWebsiteSettings } from '@/hooks/useReactQueryWebsiteSettings';
 
 // Beautiful brand-themed loading skeleton
-// const HeroBrandSkeleton = () => (
-//   <div className="absolute inset-0 bg-gradient-to-br from-navy via-terracotta/20 to-navy overflow-hidden">
-//     {/* Animated gradient overlay */}
-//     <div className="absolute inset-0 animate-pulse bg-gradient-to-t from-black/30 to-transparent" />
+const HeroBrandSkeleton = () => (
+  <div className="absolute inset-0 bg-gradient-to-br from-navy via-terracotta/20 to-navy overflow-hidden">
+    {/* Animated gradient overlay */}
+    <div className="absolute inset-0 animate-pulse bg-gradient-to-t from-black/30 to-transparent" />
     
-//     {/* Subtle moving highlights */}
-//     <div className="absolute inset-0 opacity-30">
-//       <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-terracotta/20 rounded-full blur-3xl animate-pulse" />
-//       <div className="absolute bottom-1/3 right-1/4 w-24 h-24 bg-gold/20 rounded-full blur-2xl animate-pulse" 
-//            style={{ animationDelay: '1s' }} />
-//       <div className="absolute top-1/2 left-1/2 w-16 h-16 bg-terracotta/30 rounded-full blur-xl animate-pulse" 
-//            style={{ animationDelay: '2s' }} />
-//     </div>
+    {/* Subtle moving highlights */}
+    <div className="absolute inset-0 opacity-30">
+      <div className="absolute top-1/4 left-1/4 w-32 h-32 bg-terracotta/20 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-1/3 right-1/4 w-24 h-24 bg-gold/20 rounded-full blur-2xl animate-pulse" 
+           style={{ animationDelay: '1s' }} />
+      <div className="absolute top-1/2 left-1/2 w-16 h-16 bg-terracotta/30 rounded-full blur-xl animate-pulse" 
+           style={{ animationDelay: '2s' }} />
+    </div>
     
-//     {/* Subtle texture pattern */}
-//     <div className="absolute inset-0 opacity-10"
-//          style={{
-//            backgroundImage: `radial-gradient(circle at 25% 25%, rgba(255,255,255,0.1) 1px, transparent 1px),
-//                             radial-gradient(circle at 75% 75%, rgba(255,255,255,0.1) 1px, transparent 1px)`,
-//            backgroundSize: '50px 50px'
-//          }} />
+    {/* Subtle texture pattern */}
+    <div className="absolute inset-0 opacity-10"
+         style={{
+           backgroundImage: `radial-gradient(circle at 25% 25%, rgba(255,255,255,0.1) 1px, transparent 1px),
+                            radial-gradient(circle at 75% 75%, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+           backgroundSize: '50px 50px'
+         }} />
          
-//     {/* Bottom gradient to match real image overlay */}
-//     <div className="absolute inset-0 bg-gradient-to-r from-navy/80 via-navy/60 to-navy/40" />
-//   </div>
-// );
+    {/* Bottom gradient to match real image overlay */}
+    <div className="absolute inset-0 bg-gradient-to-r from-navy/80 via-navy/60 to-navy/40" />
+  </div>
+);
 
 const Hero = () => {
-  const [daysLeft, setDaysLeft] = useState(0);
-  // const [imageLoaded, setImageLoaded] = useState(false);
+  const [daysLeft, setDaysLeft] = useState<number | null>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   // Use our React Query powered hook for settings
   const {
@@ -45,37 +45,18 @@ const Hero = () => {
   // Auto-hide skeleton after 2 seconds to ensure smooth UX
   useEffect(() => {
     const timer = setTimeout(() => {
-      // setImageLoaded(true);
-      console.log('🎯 Hero skeleton auto-hidden after 2s');
+      setImageLoaded(true);
     }, 2000);
 
     return () => clearTimeout(timer);
   }, []);
   
   useEffect(() => {
-    // If we have settings from the database, use them
     if (settings?.registration_close_date) {
-      // Log the target date for debugging
-      console.log('Registration close date from settings:', settings.registration_close_date);
-
-      // Define function to calculate and update days left
-      const calculateAndSetDaysLeft = () => {
-        // Use the direct import from utils to avoid any import chain issues
-        const daysRemaining = utilsCalculateDaysLeft(settings.registration_close_date);
-        console.log('Days remaining calculated in Hero:', daysRemaining);
-        setDaysLeft(daysRemaining);
-      };
-
-      // Calculate initial value
-      calculateAndSetDaysLeft();
-
-      // Set up a timer to update at midnight IST each day
-      const cleanup = scheduleAtMidnight(calculateAndSetDaysLeft);
-      return cleanup;
-    } else {
-      console.warn('No registration_close_date found in settings');
+      const days = utilsCalculateDaysLeft(settings.registration_close_date);
+      setDaysLeft(days);
     }
-  }, [settings]);
+  }, [settings?.registration_close_date]);
 
   // Gradient style for the overlay
   const gradientStyle = {
@@ -86,16 +67,47 @@ const Hero = () => {
     )`
   };
 
+  // Render days left text
+  const renderDaysLeft = () => {
+    if (isLoading) {
+      return (
+        <div className="animate-pulse">
+          <div className="h-6 w-32 bg-gray-200 rounded"></div>
+        </div>
+      );
+    }
+
+    if (!settings?.registration_close_date) {
+      return null;
+    }
+
+    if (daysLeft === 0) {
+      return <span className="text-red-600 font-semibold">Registration Closed</span>;
+    }
+
+    if (daysLeft === null) {
+      return null;
+    }
+
+    return (
+      <span className="text-terracotta font-semibold">
+        {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left to register
+      </span>
+    );
+  };
+
   return (
     <section className="relative min-h-screen bg-navy text-white">
       {/* Optimized background image loading */}
       <div className="absolute inset-0 bg-cover bg-center bg-no-repeat">
+        {!imageLoaded && <HeroBrandSkeleton />}
         <ResponsiveImage 
           alt="Luxury villa experience setting"
           className="h-full w-full object-cover"
           loading="eager"
           priority={true}
           dynamicKey="hero-background"
+          sizes="100vw"
         />
       </div>
       
@@ -108,7 +120,8 @@ const Hero = () => {
       {/* Hero Content - Optimized for LCP */}
       <div className="container px-4 sm:px-6 py-24 sm:py-32 mx-auto relative z-10">
         <div className="max-w-2xl flex flex-col gap-6 sm:gap-8">
-          <div>
+          {/* Critical content - Load first */}
+          <div className="animate-fade-up">
             <h1 className="text-center sm:text-left sm:text-4xl md:text-6xl font-playfair font-bold tracking-tight mb-3 sm:mb-4 text-4xl">
               Where Ambition
               <br />
@@ -120,6 +133,7 @@ const Hero = () => {
             </p>
           </div>
 
+          {/* Secondary content - Load after critical content */}
           <div className="animate-fade-up flex flex-col gap-6 sm:gap-8">
             <div className="flex justify-center sm:justify-start">
               <a 
@@ -134,9 +148,9 @@ const Hero = () => {
             
             <div className="text-center sm:text-left">
               <div className="bg-black bg-opacity-50 backdrop-blur-sm rounded-lg px-4 sm:px-6 py-3 sm:py-4 inline-block w-fit">
-                <p className="text-sm md:text-base text-gray-300 mb-1">Villa Registrations close in:</p>
+                <p className="text-sm md:text-base text-gray-300 mb-1">Villa Registrations:</p>
                 <div className="text-xl font-mono">
-                  {isLoading ? "Loading..." : `${daysLeft} Days`}
+                  {renderDaysLeft()}
                 </div>
               </div>
             </div>

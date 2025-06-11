@@ -9,14 +9,24 @@ interface PageView {
   sessionId: string;
 }
 
+// Track initialization state
+let isInitialized = false;
+let originalPushState: typeof history.pushState;
+let originalReplaceState: typeof history.replaceState;
+
 // Generate a simple session ID
 const getSessionId = (): string => {
-  let sessionId = sessionStorage.getItem('session_id');
-  if (!sessionId) {
-    sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    sessionStorage.setItem('session_id', sessionId);
+  try {
+    let sessionId = sessionStorage.getItem('session_id');
+    if (!sessionId) {
+      sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      sessionStorage.setItem('session_id', sessionId);
+    }
+    return sessionId;
+  } catch (error) {
+    // Fallback to a simple timestamp if sessionStorage is not available
+    return `session_${Date.now()}`;
   }
-  return sessionId;
 };
 
 /**
@@ -49,46 +59,87 @@ export const trackSimplePageView = (path: string): void => {
 };
 
 /**
+ * Clean up analytics event listeners and overrides
+ */
+const cleanupAnalytics = (): void => {
+  if (originalPushState && originalReplaceState) {
+    history.pushState = originalPushState;
+    history.replaceState = originalReplaceState;
+  }
+  window.removeEventListener('popstate', handlePopState);
+};
+
+/**
+ * Handle popstate events
+ */
+const handlePopState = (): void => {
+  trackSimplePageView(window.location.pathname);
+};
+
+/**
  * Initialize lightweight analytics - just sets up basic tracking
  */
 export const initializeLightweightAnalytics = (): void => {
-  // Track initial page view
-  trackSimplePageView(window.location.pathname);
+  // Prevent multiple initializations
+  if (isInitialized) {
+    return;
+  }
   
-  // Set up simple navigation tracking
-  const originalPushState = history.pushState;
-  const originalReplaceState = history.replaceState;
-  
-  // Override pushState
-  history.pushState = function(state, title, url) {
-    originalPushState.apply(this, [state, title, url]);
-    trackSimplePageView(url?.toString() || window.location.pathname);
-  };
-  
-  // Override replaceState  
-  history.replaceState = function(state, title, url) {
-    originalReplaceState.apply(this, [state, title, url]);
-    trackSimplePageView(url?.toString() || window.location.pathname);
-  };
-  
-  // Listen for popstate events (browser back/forward)
-  window.addEventListener('popstate', () => {
+  try {
+    // Store original history methods
+    originalPushState = history.pushState;
+    originalReplaceState = history.replaceState;
+    
+    // Track initial page view
     trackSimplePageView(window.location.pathname);
-  });
-  
-  console.log('🚀 Lightweight analytics initialized');
+    
+    // Override pushState
+    history.pushState = function(state, title, url) {
+      originalPushState.apply(this, [state, title, url]);
+      trackSimplePageView(url?.toString() || window.location.pathname);
+    };
+    
+    // Override replaceState  
+    history.replaceState = function(state, title, url) {
+      originalReplaceState.apply(this, [state, title, url]);
+      trackSimplePageView(url?.toString() || window.location.pathname);
+    };
+    
+    // Listen for popstate events (browser back/forward)
+    window.addEventListener('popstate', handlePopState);
+    
+    // Mark as initialized
+    isInitialized = true;
+    console.log('🚀 Lightweight analytics initialized');
+    
+    // Clean up on page unload
+    window.addEventListener('unload', cleanupAnalytics);
+  } catch (error) {
+    console.warn('Failed to initialize analytics:', error);
+    // Attempt cleanup if initialization failed
+    cleanupAnalytics();
+  }
 };
 
 /**
  * Simple days left counter without heavy imports
  */
-export const updateDaysLeftSimple = (): void => {
+export const updateDaysLeftSimple = (registrationDate?: string): void => {
   try {
-    // Simple calculation without importing heavy date utilities
+    if (!registrationDate) {
+      return;
+    }
+
+    // Parse the target date
+    const targetDate = new Date(registrationDate);
+    if (isNaN(targetDate.getTime())) {
+      return;
+    }
+
+    // Calculate days left
     const now = new Date();
-    const targetDate = new Date('2024-12-31'); // Adjust this date as needed
     const timeDiff = targetDate.getTime() - now.getTime();
-    const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    const daysLeft = Math.max(0, Math.ceil(timeDiff / (1000 * 3600 * 24)));
     
     // Store in localStorage for other components to use
     localStorage.setItem('days_left_count', daysLeft.toString());
