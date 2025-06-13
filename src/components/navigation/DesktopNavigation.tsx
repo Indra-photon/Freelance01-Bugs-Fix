@@ -24,11 +24,6 @@ const DesktopNavigation = ({ isScrolled, navLinks, user, onSignOut }: DesktopNav
     inline-flex
     items-center
     min-h-[44px]
-    focus:outline-none
-    focus:ring-2
-    focus:ring-terracotta
-    focus:ring-offset-2
-    focus:ring-offset-transparent
   `;
 
   return (
