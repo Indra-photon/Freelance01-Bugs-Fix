@@ -38,17 +38,17 @@ const NavalQuote = () => {
         <div className="max-w-4xl mx-auto space-y-8">
           <div className="space-y-2">
             {/* FIXED: Added text-center for quote text (always centered for emphasis) */}
-            <h2 className="text-center text-4xl md:text-5xl lg:text-6xl font-playfair text-navy">
+            <h2 className="text-left text-4xl md:text-5xl lg:text-6xl font-playfair text-navy">
               "The closer you want to get to me, the better your values have to be."
             </h2>
 
-            <p className="text-center text-xl md:text-2xl text-gray-600 font-playfair italic">
+            <p className="text-left text-xl md:text-2xl text-gray-600 font-playfair italic">
               ~ Naval Ravikant
             </p>
           </div>
           
           {/* FIXED: Added text-center sm:text-left for body content alignment */}
-          <p className="text-center md:text-2xl text-gray-600 border-l-4 border-terracotta pl-6 text-xl">
+          <p className="text-left md:text-2xl text-gray-600 border-l-4 border-terracotta pl-6 text-xl">
             Exclusivity ensures depth. No crowds, no noise – just you, your new friends, and a crazy f-ing experience.
           </p>
           
@@ -57,14 +57,14 @@ const NavalQuote = () => {
             <div className="space-y-4 text-center">
               <div className="text-5xl md:text-7xl font-bold text-navy">83%</div>
               {/* FIXED: Added text-center sm:text-left for statistic descriptions */}
-              <p className="text-center text-lg md:text-xl text-gray-600">
+              <p className="text-lg md:text-xl text-gray-600 text-left">
                 individuals report improved performance in collaborative work when their team is more likeminded.
               </p>
             </div>
             <div className="space-y-4 text-center">
               <div className="text-5xl md:text-7xl font-bold text-terracotta">49%</div>
               {/* FIXED: Added text-center sm:text-left for statistic descriptions */}
-              <p className="text-center text-lg md:text-xl text-gray-600">
+              <p className="text-lg md:text-xl text-gray-600 text-left">
                 potential achievers are deterred from innovative ideas and passionate ventures due to their fear of criticism and societal pressure.
               </p>
             </div>
