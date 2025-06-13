@@ -215,7 +215,7 @@ const Navigation = () => {
       animate="visible"
       variants={navVariants}
     >
-      <div className="container mx-auto px-4 sm:px-6">
+      <div className="px-4 sm:px-6">
         <div className="flex items-center justify-between">
           <motion.div variants={logoVariants}>
             <Logo isPastHero={isPastHero} />
