@@ -34,8 +34,8 @@ const Hero = () => {
       opacity: 1,
       transition: {
         type: "tween",
-        duration: 0.3,
-        ease: "easeOut"
+        duration: 0.7,
+        ease: "easeInOut"
       }
     }
   };
@@ -47,8 +47,8 @@ const Hero = () => {
       y: 0,
       transition: {
         type: "tween",
-        duration: 0.3,
-        ease: "easeOut"
+        duration: 0.7,
+        ease: "easeInOut"
       }
     }
   };
@@ -60,8 +60,8 @@ const Hero = () => {
       opacity: 1,
       transition: {
         type: "tween",
-        duration: 0.3,
-        ease: "easeOut"
+        duration: 0.7,
+        ease: "easeInOut"
       }
     }
   };
@@ -73,8 +73,8 @@ const Hero = () => {
       opacity: 1,
       transition: {
         type: "tween",
-        duration: 0.3,
-        ease: "easeOut"
+        duration: 0.7,
+        ease: "easeInOut"
       }
     }
   };
@@ -175,7 +175,7 @@ const Hero = () => {
           {/* Critical content - Load first */}
           <div>
             <motion.h1 
-              className="text-left sm:text-center md:text-center lg:text-center xl:text-left sm:text-4xl md:text-6xl font-playfair font-bold tracking-tight mb-3 sm:mb-4 text-4xl"
+              className="text-left sm:text-left md:text-left lg:text-left xl:text-left sm:text-4xl md:text-6xl font-playfair font-bold tracking-tight mb-3 sm:mb-4 text-4xl"
               variants={titleVariants}
             >
               Where Ambition
@@ -184,7 +184,7 @@ const Hero = () => {
             </motion.h1>
 
             <motion.p 
-              className="text-left sm:text-center md:text-center lg:text-center xl:text-left sm:text-lg md:text-xl text-gray-200 text-base"
+              className="text-left sm:text-left md:text-left lg:text-left xl:text-left sm:text-lg md:text-xl text-gray-200 text-base"
               variants={subtitleVariants}
             >
               Surround yourself with the right people
