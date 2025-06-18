@@ -21,60 +21,60 @@ const Hero = () => {
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.3,
-        delayChildren: 0.2
+        staggerChildren: 0.05,
+        delayChildren: 0
       }
     }
   };
 
   const titleVariants = {
-    hidden: { x: -100, opacity: 0 },
+    hidden: { x: -50, opacity: 1 },
     visible: {
       x: 0,
       opacity: 1,
       transition: {
-        type: "spring",
-        stiffness: 100,
-        damping: 15
+        type: "tween",
+        duration: 0.3,
+        ease: "easeOut"
       }
     }
   };
 
   const subtitleVariants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0, y: 10 },
     visible: {
       opacity: 1,
       y: 0,
       transition: {
-        type: "spring",
-        stiffness: 100,
-        damping: 15
+        type: "tween",
+        duration: 0.3,
+        ease: "easeOut"
       }
     }
   };
 
   const ctaVariants = {
-    hidden: { scale: 0.8, opacity: 0 },
+    hidden: { scale: 0.95, opacity: 0 },
     visible: {
       scale: 1,
       opacity: 1,
       transition: {
-        type: "spring",
-        stiffness: 200,
-        damping: 10
+        type: "tween",
+        duration: 0.3,
+        ease: "easeOut"
       }
     }
   };
 
   const daysLeftVariants = {
-    hidden: { y: 20, opacity: 0 },
+    hidden: { y: 10, opacity: 0 },
     visible: {
       y: 0,
       opacity: 1,
       transition: {
-        type: "spring",
-        stiffness: 100,
-        damping: 15
+        type: "tween",
+        duration: 0.3,
+        ease: "easeOut"
       }
     }
   };
