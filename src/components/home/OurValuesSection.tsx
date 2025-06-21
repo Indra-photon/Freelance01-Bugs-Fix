@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useSectionRevealAnimation } from './useSectionRevealAnimation';
+import { Link } from 'react-router-dom';
 
 const OurValuesSection = () => {
   // Section header animations
@@ -322,7 +323,7 @@ const OurValuesSection = () => {
         </div>
 
         {/* CTA Button with scroll trigger */}
-        <motion.div 
+        {/* <motion.div 
           className="flex justify-center mb-5 mt-10"
           ref={ctaAnimation.ref}
           variants={ctaAnimation.parentVariants}
@@ -349,6 +350,43 @@ const OurValuesSection = () => {
               Apply Now
             </motion.span>
           </motion.a>
+        </motion.div> */}
+        <motion.div 
+          className="flex justify-center mt-16"
+          ref={ctaAnimation.ref}
+          variants={ctaAnimation.parentVariants}
+          initial="hidden"
+          animate={ctaAnimation.controls}
+        >
+          <motion.div
+            variants={ctaAnimation.childVariants}
+          >
+            <Link 
+              to="https://docs.google.com/forms/d/1TTHQN3gG2ZtC26xlh0lU8HeiMc3qDJhfoU2tOh9qLQM/edit" 
+              className="px-6 py-3 bg-terracotta text-white rounded-lg transition-all duration-300 hover:bg-terracotta hover:scale-105 hover:shadow-lg inline-block group"
+            >
+              <motion.span
+                className="flex items-center gap-2"
+                whileHover={{ x: 5 }}
+                transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              >
+                Apply Now
+                <motion.svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="group-hover:translate-x-1 transition-transform"
+                >
+                  <path d="M5 12h14M12 5l7 7-7 7"/>
+                </motion.svg>
+              </motion.span>
+            </Link>
+          </motion.div>
         </motion.div>
       </div>
     </section>

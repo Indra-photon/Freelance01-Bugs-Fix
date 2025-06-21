@@ -1,4 +1,3 @@
-import React from 'react';
 import { User } from '@supabase/supabase-js';
 import MobileNavigationLink from './MobileNavigationLink';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,7 +50,7 @@ const MobileMenu = ({ isOpen, isScrolled, toggleMenu, navLinks, user, onSignOut 
         <div className="lg:hidden fixed inset-x-0 top-0 z-40 flex justify-center items-start min-h-screen">
           {/* Glass background always visible, not animated */}
           <div 
-            className={`w-full max-w-xs w-[88vw] mx-auto mt-8 rounded-3xl p-6 shadow-2xl backdrop-blur-lg flex flex-col gap-0 relative ${
+            className={`max-w-xs w-[88vw] mx-auto mt-8 rounded-3xl p-6 shadow-2xl backdrop-blur-lg flex flex-col gap-0 relative ${
               isScrolled 
                 ? 'border border-navy/15 bg-navy/85' 
                 : 'border border-white/25 bg-white/8'
