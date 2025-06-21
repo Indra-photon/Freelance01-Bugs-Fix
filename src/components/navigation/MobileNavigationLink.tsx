@@ -59,7 +59,7 @@ const MobileNavigationLink = ({
         block w-full text-left
         text-lg font-medium tracking-wide
         py-4 min-h-[44px] px-4
-        ${isScrolled ? 'text-navy' : 'text-white'}
+        ${isScrolled ? 'text-white' : 'text-white'}
         rounded-2xl
         transition-all duration-200
         focus:outline-none focus:ring-2 focus:ring-terracotta
@@ -68,7 +68,10 @@ const MobileNavigationLink = ({
       onClick={onClick}
       target={external ? "_blank" : undefined}
       rel={external ? "noopener noreferrer" : undefined}
-      whileHover={{ backgroundColor: 'rgba(255,255,255,0.05)', color: '#C95A3A' }}
+      whileHover={{ 
+        backgroundColor: 'rgba(255,255,255,0.1)',     // ✅ Slightly more visible hover
+        color: '#E07A5F'                              // ✅ Terracotta on hover
+      }}
       whileTap={{ scale: 0.98 }}
       {...(variants ? { variants, custom } : {})}
     >

@@ -31,13 +31,12 @@ const HeroSection = () => {
   });
 
   const ctaAnimation = useSectionRevealAnimation({
-    variant: 'fade-right',
-    once: false,
-    threshold: { desktop: 0.4, mobile: 0.3 },
-    delayChildren: 0.4,
-    duration: 0.7, // Slightly longer duration for smoother motion
-    staggerChildren: 0.15 // Consistent with fade-right timing
-  });
+  variant: 'fade-up',                            // ✅ Very subtle slide + fade
+  once: false,
+  threshold: { desktop: 0.6, mobile: 0.5 },
+  delayChildren: 0.3,
+  duration: 0.8
+});
 
   const counterAnimation = useSectionRevealAnimation({
     variant: 'fade-up',
@@ -153,7 +152,7 @@ const HeroSection = () => {
 
       {/* Hero Content with advanced scroll triggers */}
       <div className="mx-6 py-24 sm:py-32 relative z-10">
-        <div className="max-w-2xl flex flex-col items-start justify-start gap-6 sm:gap-8">
+        <div className="max-w-2xl flex flex-col items-start justify-start gap-1">
           
           {/* Title with scroll-triggered animation */}
           <motion.div
@@ -163,7 +162,7 @@ const HeroSection = () => {
             animate={titleAnimation.controls}
           >
             <motion.h1 
-              className="text-left sm:text-center md:text-center lg:text-center xl:text-left sm:text-4xl md:text-6xl font-playfair font-bold tracking-tight mb-3 sm:mb-4 text-4xl"
+              className="text-left sm:text-center md:text-center lg:text-center xl:text-left sm:text-4xl md:text-6xl font-playfair font-bold tracking-tight sm:mb-4 text-4xl"
               variants={titleAnimation.childVariants}
             >
               <motion.span
@@ -194,7 +193,7 @@ const HeroSection = () => {
             animate={subtitleAnimation.controls}
           >
             <motion.p 
-              className="text-left sm:text-center md:text-center lg:text-center xl:text-left sm:text-lg md:text-xl text-gray-200 text-base"
+              className="text-left sm:text-center md:text-center lg:text-center xl:text-left sm:text-lg md:text-xl text-gray-200 text-base mb-5"
               variants={subtitleAnimation.childVariants}
             >
               Surround yourself with the right people
@@ -203,18 +202,16 @@ const HeroSection = () => {
 
           {/* CTA Button with smooth fade-right animation */}
           <motion.div
-            ref={subtitleAnimation.ref}
-            variants={subtitleAnimation.parentVariants}
-            initial="hidden"
-            animate={subtitleAnimation.controls}
-            className="flex justify-start sm:justify-center md:justify-center lg:justify-center xl:justify-start"
+            className="flex justify-start sm:justify-center md:justify-center lg:justify-center xl:justify-start mb-2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1, duration: 0.5 }}  // Simple 1s delay, 0.5s fade
           >
             <motion.a 
               href="https://docs.google.com/forms/d/1TTHQN3gG2ZtC26xlh0lU8HeiMc3qDJhfoU2tOh9qLQM/edit" 
               target="_blank" 
               rel="noopener noreferrer" 
               className="px-6 sm:px-8 py-3 bg-terracotta text-white rounded-lg hover:bg-opacity-90 transition-all text-base sm:text-lg font-medium w-fit flex items-center gap-2 group"
-              variants={subtitleAnimation.childVariants}
             >
               <span>The Frat Villa Entry</span>
               <ArrowRight 

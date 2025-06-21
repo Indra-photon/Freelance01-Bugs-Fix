@@ -243,10 +243,10 @@ const VillaLabSection = () => {
         {/* Gallery Grid with sophisticated scroll reveals */}
         <motion.div 
           className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 md:gap-4"
-          ref={galleryAnimation.ref}
-          variants={galleryAnimation.parentVariants}
-          initial="hidden"
-          animate={galleryAnimation.controls}
+          // ref={galleryAnimation.ref}
+          // variants={galleryAnimation.parentVariants}
+          // initial="hidden"
+          // animate={galleryAnimation.controls}
         >
           {activities.slice(0, displayCount).map((activity, index) => {
             // Determine loading strategy:

@@ -50,11 +50,22 @@ const MobileMenu = ({ isOpen, isScrolled, toggleMenu, navLinks, user, onSignOut 
       {isOpen && (
         <div className="lg:hidden fixed inset-x-0 top-0 z-40 flex justify-center items-start min-h-screen">
           {/* Glass background always visible, not animated */}
-          <div className="w-full max-w-xs w-[88vw] mx-auto mt-8 rounded-3xl p-6 shadow-2xl border border-white/25 backdrop-blur-lg bg-white/8 bg-opacity-80 flex flex-col gap-0 relative"
+          <div 
+            className={`w-full max-w-xs w-[88vw] mx-auto mt-8 rounded-3xl p-6 shadow-2xl backdrop-blur-lg flex flex-col gap-0 relative ${
+              isScrolled 
+                ? 'border border-navy/15 bg-navy/85' 
+                : 'border border-white/25 bg-white/8'
+            }`}
             style={{
-              background: 'rgba(255,255,255,0.08)',
-              boxShadow: '0 8px 40px 0 rgba(0,0,0,0.18)',
-              border: '1px solid rgba(255,255,255,0.25)',
+              background: isScrolled 
+                ? 'rgba(10, 26, 47, 0.85)'    // ✅ Lighter - was 0.95
+                : 'rgba(255,255,255,0.08)',
+              boxShadow: isScrolled
+                ? '0 8px 40px 0 rgba(10, 26, 47, 0.2)'  // ✅ Lighter shadow - was 0.3
+                : '0 8px 40px 0 rgba(0,0,0,0.18)',
+              border: isScrolled
+                ? '1px solid rgba(10, 26, 47, 0.15)'    // ✅ Lighter border - was 0.2
+                : '1px solid rgba(255,255,255,0.25)',
             }}
           >
             {/* Close (X) Button */}
